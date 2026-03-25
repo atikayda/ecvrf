@@ -170,7 +170,7 @@ jobs:
         working-directory: solidity
         run: |
           git init
-          forge install foundry-rs/forge-std --no-commit
+          forge install foundry-rs/forge-std --no-git
       - name: Run tests
         working-directory: solidity
         run: forge test
