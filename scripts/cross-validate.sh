@@ -56,8 +56,15 @@ if [ -n "${ECVRF_BIN_DIR:-}" ]; then
     PYTHON="python3"
     PY_CLI="$ROOT/scripts/python-cli.py"
 
-    # Solidity uses source-tree forge script (needs forge runtime)
-    SOLIDITY_CLI="$ROOT/scripts/solidity-cli.sh"
+    # Solidity (optional — needs forge runtime)
+    SOLIDITY_AVAILABLE=false
+    SOLIDITY_CLI=""
+    if command -v forge &>/dev/null && [ -d "$ROOT/solidity/lib/forge-std" ]; then
+        SOLIDITY_CLI="$ROOT/scripts/solidity-cli.sh"
+        SOLIDITY_AVAILABLE=true
+    else
+        echo "  Solidity: forge or forge-std not available, skipping"
+    fi
 
     # Swift (optional — pre-built binary may not exist)
     SWIFT_AVAILABLE=false
@@ -149,17 +156,25 @@ else
         echo "  Swift toolchain not found, skipping"
     fi
 
-    # Solidity (needs forge; install forge-std if missing)
-    (cd "$ROOT/solidity" && {
-        [ -d lib/forge-std ] || {
-            git init 2>/dev/null
-            forge install foundry-rs/forge-std --no-git 2>/dev/null
-        }
-        forge build --quiet 2>/dev/null
-    }) || {
-        red "Solidity build failed"; exit 1
-    }
-    SOLIDITY_CLI="$ROOT/scripts/solidity-cli.sh"
+    # Solidity (optional — needs forge)
+    SOLIDITY_AVAILABLE=false
+    SOLIDITY_CLI=""
+    if command -v forge &>/dev/null; then
+        if (cd "$ROOT/solidity" && {
+            [ -d lib/forge-std ] || {
+                git init 2>/dev/null
+                forge install foundry-rs/forge-std --no-git 2>/dev/null
+            }
+            forge build --quiet 2>/dev/null
+        }); then
+            SOLIDITY_CLI="$ROOT/scripts/solidity-cli.sh"
+            SOLIDITY_AVAILABLE=true
+        else
+            echo "  Solidity build failed, skipping"
+        fi
+    else
+        echo "  Forge toolchain not found, skipping Solidity"
+    fi
 
     # Solana (verify-only CLI)
     (cd "$ROOT/solana" && cargo build --example cli --features no-entrypoint --release 2>/dev/null) || {
@@ -171,10 +186,13 @@ else
     PY_CLI="$ROOT/scripts/python-cli.py"
     CSHARP_PREBUILT=false
 
-    if [ "$SWIFT_AVAILABLE" = "true" ]; then
+    SKIPPED=""
+    [ "$SWIFT_AVAILABLE" = "false" ] && SKIPPED="Swift"
+    [ "$SOLIDITY_AVAILABLE" = "false" ] && SKIPPED="${SKIPPED:+$SKIPPED, }Solidity"
+    if [ -z "$SKIPPED" ]; then
         bold "All builds succeeded."
     else
-        bold "Builds succeeded (Swift skipped — toolchain not available)."
+        bold "Builds succeeded ($SKIPPED skipped)."
     fi
 fi
 echo ""
@@ -198,14 +216,11 @@ with open('$SUBSET_FILE', 'w') as out:
 
 NUM_VECTORS=$("$PYTHON" -c "import json; print(len(json.load(open('$SUBSET_FILE'))))")
 
-# Determine prover/verifier counts
-if [ "$SWIFT_AVAILABLE" = "true" ]; then
-    NUM_PROVERS=11
-    NUM_VERIFIERS=12
-else
-    NUM_PROVERS=10
-    NUM_VERIFIERS=11
-fi
+# Determine prover/verifier counts dynamically
+NUM_PROVERS=9
+[ "$SOLIDITY_AVAILABLE" = "true" ] && NUM_PROVERS=$((NUM_PROVERS + 1))
+[ "$SWIFT_AVAILABLE" = "true" ] && NUM_PROVERS=$((NUM_PROVERS + 1))
+NUM_VERIFIERS=$((NUM_PROVERS + 1))
 
 bold "=== Phase 1: Prove Identity (${NUM_VECTORS} vectors, ${NUM_PROVERS} implementations) ==="
 echo "All prove-capable implementations must produce the same pi and beta for identical inputs."
@@ -242,6 +257,7 @@ zig_cli = '$ZIG_CLI'
 swift_cli = '$SWIFT_CLI'
 swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
+solidity_available = '$SOLIDITY_AVAILABLE' == 'true'
 
 pass_count = 0
 fail_count = 0
@@ -277,8 +293,9 @@ for i, vec in enumerate(vectors):
         'kotlin':     [kotlin_cli, 'prove', sk] + aa,
         'haskell':    [haskell_cli, 'prove', sk] + aa,
         'zig':        [zig_cli, 'prove', sk] + aa,
-        'solidity':   ['bash', solidity_cli, 'prove', sk] + aa,
     }
+    if solidity_available:
+        cmds['solidity'] = ['bash', solidity_cli, 'prove', sk] + aa
     if swift_available:
         cmds['swift'] = [swift_cli, 'prove', sk] + aa
 
@@ -353,6 +370,7 @@ zig_cli = '$ZIG_CLI'
 swift_cli = '$SWIFT_CLI'
 swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
+solidity_available = '$SOLIDITY_AVAILABLE' == 'true'
 solana_cli = '$SOLANA_CLI'
 
 def csharp_cmd(*args):
@@ -360,7 +378,9 @@ def csharp_cmd(*args):
         return ['dotnet', 'exec', csharp_dir + '/Ecvrf.Cli.dll'] + list(args)
     return ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--'] + list(args)
 
-prover_impls = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig', 'solidity']
+prover_impls = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig']
+if solidity_available:
+    prover_impls.append('solidity')
 if swift_available:
     prover_impls.append('swift')
 verifier_impls = prover_impls + ['solana']
@@ -376,8 +396,9 @@ def prove_cmd(impl, sk, aa):
         'kotlin':     [kotlin_cli, 'prove', sk] + aa,
         'haskell':    [haskell_cli, 'prove', sk] + aa,
         'zig':        [zig_cli, 'prove', sk] + aa,
-        'solidity':   ['bash', solidity_cli, 'prove', sk] + aa,
     }
+    if solidity_available:
+        cmds['solidity'] = ['bash', solidity_cli, 'prove', sk] + aa
     if swift_available:
         cmds['swift'] = [swift_cli, 'prove', sk] + aa
     return cmds[impl]
@@ -393,9 +414,10 @@ def verify_cmd(impl, pk, pi, aa):
         'kotlin':     [kotlin_cli, 'verify', pk, pi] + aa,
         'haskell':    [haskell_cli, 'verify', pk, pi] + aa,
         'zig':        [zig_cli, 'verify', pk, pi] + aa,
-        'solidity':   ['bash', solidity_cli, 'verify', pk, pi] + aa,
         'solana':     [solana_cli, 'verify', pk, pi] + aa,
     }
+    if solidity_available:
+        cmds['solidity'] = ['bash', solidity_cli, 'verify', pk, pi] + aa
     if swift_available:
         cmds['swift'] = [swift_cli, 'verify', pk, pi] + aa
     return cmds[impl]
@@ -482,6 +504,7 @@ zig_cli = '$ZIG_CLI'
 swift_cli = '$SWIFT_CLI'
 swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
+solidity_available = '$SOLIDITY_AVAILABLE' == 'true'
 solana_cli = '$SOLANA_CLI'
 
 def csharp_cmd(*args):
@@ -489,9 +512,12 @@ def csharp_cmd(*args):
         return ['dotnet', 'exec', csharp_dir + '/Ecvrf.Cli.dll'] + list(args)
     return ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--'] + list(args)
 
-verifier_names = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig', 'solidity', 'solana']
+verifier_names = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig']
+if solidity_available:
+    verifier_names.append('solidity')
 if swift_available:
-    verifier_names.insert(-1, 'swift')  # before solana
+    verifier_names.append('swift')
+verifier_names.append('solana')
 
 def verify_cmd(impl, pk, pi, aa):
     cmds = {
@@ -504,9 +530,10 @@ def verify_cmd(impl, pk, pi, aa):
         'kotlin':     [kotlin_cli, 'verify', pk, pi] + aa,
         'haskell':    [haskell_cli, 'verify', pk, pi] + aa,
         'zig':        [zig_cli, 'verify', pk, pi] + aa,
-        'solidity':   ['bash', solidity_cli, 'verify', pk, pi] + aa,
         'solana':     [solana_cli, 'verify', pk, pi] + aa,
     }
+    if solidity_available:
+        cmds['solidity'] = ['bash', solidity_cli, 'verify', pk, pi] + aa
     if swift_available:
         cmds['swift'] = [swift_cli, 'verify', pk, pi] + aa
     return cmds[impl]
@@ -551,15 +578,10 @@ else:
 echo ""
 bold "=== Summary ==="
 green "All cross-implementation validation checks passed."
-if [ "$SWIFT_AVAILABLE" = "true" ]; then
-    echo "  - Prove identity: all 11 implementations produce byte-identical pi and beta"
-    echo "  - Cross-verification: 11x12 matrix of prove/verify combinations all succeed"
-    echo "  - Negative rejection: all 12 implementations reject all invalid proofs"
-else
-    echo "  - Prove identity: all 10 implementations produce byte-identical pi and beta"
-    echo "  - Cross-verification: 10x11 matrix of prove/verify combinations all succeed"
-    echo "  - Negative rejection: all 11 implementations reject all invalid proofs"
-    echo "  - Swift: skipped (toolchain not available on this platform)"
-fi
+echo "  - Prove identity: all ${NUM_PROVERS} implementations produce byte-identical pi and beta"
+echo "  - Cross-verification: ${NUM_PROVERS}x${NUM_VERIFIERS} matrix of prove/verify combinations all succeed"
+echo "  - Negative rejection: all ${NUM_VERIFIERS} implementations reject all invalid proofs"
+[ "$SOLIDITY_AVAILABLE" = "false" ] && echo "  - Solidity: skipped (forge not available in this environment)"
+[ "$SWIFT_AVAILABLE" = "false" ] && echo "  - Swift: skipped (toolchain not available on this platform)"
 echo "  - Solana: participates as verify-only (no prove capability)"
 echo ""

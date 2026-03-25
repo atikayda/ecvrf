@@ -2,6 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+_stderr=$(mktemp)
+trap 'rm -f "$_stderr"' EXIT
 
 read_alpha() {
     if [ "$1" = "--alpha-file" ]; then
@@ -18,7 +20,11 @@ if [ "$CMD" = "prove" ]; then
     ALPHA="$(read_alpha "$@")"
     OUTPUT=$(cd "$ROOT/solidity" && \
         ECVRF_CMD=prove ECVRF_SK="0x$SK" ECVRF_ALPHA="0x$ALPHA" \
-        forge script script/Cli.s.sol -v 2>/dev/null)
+        forge script script/Cli.s.sol -v 2>"$_stderr") || {
+        echo "forge script failed (prove):" >&2
+        cat "$_stderr" >&2
+        exit 1
+    }
     LINE=$(echo "$OUTPUT" | grep 'ECVRF_OUT:' | head -1 | sed 's/^[[:space:]]*//')
     PI=$(echo "$LINE" | cut -d: -f2 | sed 's/^0x//')
     BETA=$(echo "$LINE" | cut -d: -f3 | sed 's/^0x//')
@@ -30,7 +36,7 @@ elif [ "$CMD" = "verify" ]; then
     ALPHA="$(read_alpha "$@")"
     OUTPUT=$(cd "$ROOT/solidity" && \
         ECVRF_CMD=verify ECVRF_PK="0x$PK" ECVRF_PI="0x$PI" ECVRF_ALPHA="0x$ALPHA" \
-        forge script script/Cli.s.sol -v 2>/dev/null) || true
+        forge script script/Cli.s.sol -v 2>"$_stderr") || true
     LINE=$(echo "$OUTPUT" | grep 'ECVRF_OUT:' | head -1 | sed 's/^[[:space:]]*//')
     if [ -z "$LINE" ]; then
         echo '{"valid":false,"beta":null}'

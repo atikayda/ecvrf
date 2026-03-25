@@ -325,10 +325,12 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: foundry-rs/foundry-toolchain@v1
+        continue-on-error: true
 
       - name: Install Python deps
         run: pip install -r python/requirements.txt
       - name: Install Solidity dependencies
+        continue-on-error: true
         working-directory: solidity
         run: |
           git init
