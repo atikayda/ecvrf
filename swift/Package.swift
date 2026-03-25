@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "ECVRF", targets: ["ECVRF"]),
         .executable(name: "ecvrf-test", targets: ["ECVRFTest"]),
+        .executable(name: "ecvrf-cli", targets: ["ECVRFCli"]),
     ],
     dependencies: [
         .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.17.0"),
@@ -22,6 +23,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "ECVRFTest",
+            dependencies: ["ECVRF"]
+        ),
+        .executableTarget(
+            name: "ECVRFCli",
             dependencies: ["ECVRF"]
         ),
     ]

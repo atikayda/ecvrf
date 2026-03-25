@@ -14,6 +14,16 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(lib);
 
+    const cli = b.addExecutable(.{
+        .name = "ecvrf-cli",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/cli.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(cli);
+
     const unit_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/ecvrf.zig"),

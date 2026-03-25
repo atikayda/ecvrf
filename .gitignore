@@ -37,6 +37,7 @@ dist/
 
 # C
 c/ecvrf_test
+c/ecvrf_cli
 c/vectors_data.h
 c/*.o
 

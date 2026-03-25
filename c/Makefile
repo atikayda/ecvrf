@@ -6,10 +6,13 @@ LDFLAGS = -L$(OPENSSL_PREFIX)/lib -lcrypto
 
 .PHONY: all test clean
 
-all: ecvrf_test
+all: ecvrf_test ecvrf_cli
 
 vectors_data.h: ../vectors/vectors.json gen_vectors.py
 	python3 gen_vectors.py $< > $@
+
+ecvrf_cli: ecvrf.c ecvrf_cli.c ecvrf.h
+	$(CC) $(CFLAGS) -o $@ ecvrf.c ecvrf_cli.c $(LDFLAGS)
 
 ecvrf_test: ecvrf.c ecvrf_test.c ecvrf.h vectors_data.h
 	$(CC) $(CFLAGS) -o $@ ecvrf.c ecvrf_test.c $(LDFLAGS)
@@ -18,4 +21,4 @@ test: ecvrf_test
 	./ecvrf_test
 
 clean:
-	rm -f ecvrf_test vectors_data.h
+	rm -f ecvrf_test ecvrf_cli vectors_data.h
