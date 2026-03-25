@@ -55,6 +55,15 @@ jobs:
       - name: Run tests
         working-directory: go
         run: go test -v -count=1 ./...
+      - name: Build CLI
+        run: |
+          cd go
+          go build -o ecvrf-go ./cmd/ecvrf-cli
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-go
+          path: go/ecvrf-go
+          retention-days: 1
 
   rust:
     name: Rust tests
@@ -68,6 +77,14 @@ jobs:
       - name: Run tests
         working-directory: rust
         run: cargo test --release -- --nocapture
+      - name: Build CLI
+        working-directory: rust
+        run: cargo build --example cli --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-rust
+          path: rust/target/release/examples/cli
+          retention-days: 1
 
   typescript:
     name: TypeScript tests
@@ -83,6 +100,16 @@ jobs:
       - name: Build and test
         working-directory: typescript
         run: npm test
+      - name: Stage TypeScript CLI artifact
+        run: |
+          mkdir -p ts-cli-out/dist
+          cp scripts/node-cli.mjs ts-cli-out/
+          cp -r typescript/dist/* ts-cli-out/dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-typescript
+          path: ts-cli-out/
+          retention-days: 1
 
   c:
     name: C tests
@@ -94,6 +121,14 @@ jobs:
       - name: Build and test
         working-directory: c
         run: make test
+      - name: Build CLI
+        working-directory: c
+        run: make ecvrf_cli
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-c
+          path: c/ecvrf_cli
+          retention-days: 1
 
   csharp:
     name: C# tests
@@ -106,6 +141,14 @@ jobs:
       - name: Run tests
         working-directory: csharp
         run: dotnet test
+      - name: Publish CLI
+        working-directory: csharp/Ecvrf.Cli
+        run: dotnet publish -c Release -o ../../cli-csharp-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-csharp
+          path: cli-csharp-out/
+          retention-days: 1
 
   kotlin:
     name: Kotlin tests
@@ -120,6 +163,14 @@ jobs:
       - name: Run tests
         working-directory: kotlin
         run: gradle test
+      - name: Build distribution
+        working-directory: kotlin
+        run: gradle installDist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-kotlin
+          path: kotlin/build/install/ecvrf-kotlin/
+          retention-days: 1
 
   haskell:
     name: Haskell tests
@@ -136,6 +187,15 @@ jobs:
           cabal update
           cabal build all --enable-tests
           cabal test --test-show-details=direct
+      - name: Copy CLI binary
+        run: |
+          mkdir -p haskell-cli-out
+          cp "$(cd haskell && cabal list-bin ecvrf-cli)" haskell-cli-out/ecvrf-cli
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-haskell
+          path: haskell-cli-out/ecvrf-cli
+          retention-days: 1
 
   zig:
     name: Zig tests
@@ -148,6 +208,14 @@ jobs:
       - name: Run tests
         working-directory: zig
         run: zig build test
+      - name: Build CLI
+        working-directory: zig
+        run: zig build -Doptimize=ReleaseFast
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-zig
+          path: zig/zig-out/bin/ecvrf-cli
+          retention-days: 1
 
   swift:
     name: Swift tests
@@ -187,6 +255,14 @@ jobs:
       - name: Run tests
         working-directory: solana
         run: cargo test
+      - name: Build CLI
+        working-directory: solana
+        run: cargo build --example cli --features no-entrypoint --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-solana
+          path: solana/target/release/examples/cli
+          retention-days: 1
 
   cross-validate:
     name: Cross-implementation validation
@@ -194,23 +270,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Download all pre-built CLI artifacts
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-go
+          path: artifacts/go
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-rust
+          path: artifacts/rust
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-typescript
+          path: artifacts/typescript
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-c
+          path: artifacts/c
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-csharp
+          path: artifacts/csharp
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-kotlin
+          path: artifacts/kotlin
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-haskell
+          path: artifacts/haskell
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-zig
+          path: artifacts/zig
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-solana
+          path: artifacts/solana
+
+      # Runtimes needed: Python (orchestrator + python CLI), Node (TS CLI),
+      # .NET (C# CLI), JRE (Kotlin CLI), Foundry (Solidity CLI)
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: actions/setup-go@v5
-        with:
-          go-version: stable
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            rust
-            solana
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
-      - name: Install OpenSSL dev headers
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
@@ -218,29 +324,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@v4
-      - uses: haskell-actions/setup@v2
-        with:
-          ghc-version: "9.10"
-          cabal-version: latest
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: 0.14.0
       - uses: foundry-rs/foundry-toolchain@v1
+
       - name: Install Python deps
         run: pip install -r python/requirements.txt
-      - name: Install TypeScript deps
-        working-directory: typescript
-        run: npm ci
-      - name: Build TypeScript
-        working-directory: typescript
-        run: npm run build
-      - name: Cabal update
-        run: cabal update
       - name: Install Solidity dependencies
         working-directory: solidity
         run: |
           git init
           forge install foundry-rs/forge-std --no-git
+
       - name: Run cross-validation
+        env:
+          ECVRF_BIN_DIR: ${{ github.workspace }}/artifacts
         run: bash scripts/cross-validate.sh

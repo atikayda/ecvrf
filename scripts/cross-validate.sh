@@ -4,6 +4,13 @@ set -euo pipefail
 # Cross-implementation validation for ECVRF-SECP256K1-SHA256-TAI
 # Verifies all prove-capable implementations produce byte-identical output
 # and can verify each other's proofs. Solana participates as verify-only.
+#
+# Set ECVRF_BIN_DIR to a directory containing pre-built CLI binaries to skip
+# all build steps. Expected layout inside ECVRF_BIN_DIR:
+#   go/ecvrf-go, rust/cli, c/ecvrf_cli, haskell/ecvrf-cli, zig/ecvrf-cli,
+#   solana/cli, kotlin/ (installDist tree), csharp/ (dotnet publish output),
+#   typescript/ (dist/ + node-cli.mjs), swift/ecvrf-cli (optional)
+# Python and Solidity use scripts from the source tree (no pre-built binary).
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VECTORS="$ROOT/vectors/vectors.json"
@@ -32,97 +39,139 @@ export PATH="$HOME/.ghcup/bin:$PATH"
 
 # ── Prerequisites ──────────────────────────────────────────────────────
 
-bold "Building implementations..."
+if [ -n "${ECVRF_BIN_DIR:-}" ]; then
+    bold "Using pre-built binaries from $ECVRF_BIN_DIR"
 
-# Go
-(cd "$ROOT/go" && go build -o "$ROOT/scripts/.bin/ecvrf-go" ./cmd/ecvrf-cli) || {
-    red "Go build failed"; exit 1
-}
+    GO_CLI="$ECVRF_BIN_DIR/go/ecvrf-go"
+    RUST_CLI="$ECVRF_BIN_DIR/rust/cli"
+    C_CLI="$ECVRF_BIN_DIR/c/ecvrf_cli"
+    HASKELL_CLI="$ECVRF_BIN_DIR/haskell/ecvrf-cli"
+    ZIG_CLI="$ECVRF_BIN_DIR/zig/ecvrf-cli"
+    SOLANA_CLI="$ECVRF_BIN_DIR/solana/cli"
+    KOTLIN_CLI="$ECVRF_BIN_DIR/kotlin/bin/ecvrf-kotlin"
+    CSHARP_CLI_DIR="$ECVRF_BIN_DIR/csharp"
+    NODE_CLI="$ECVRF_BIN_DIR/typescript/node-cli.mjs"
 
-# Rust
-(cd "$ROOT/rust" && cargo build --example cli --release 2>/dev/null) || {
-    red "Rust build failed"; exit 1
-}
-RUST_CLI="$ROOT/rust/target/release/examples/cli"
-
-# Python venv
-PYTHON="$ROOT/python/.venv/bin/python3"
-if [ ! -x "$PYTHON" ]; then
+    # Python uses source-tree scripts (interpreted)
     PYTHON="python3"
-fi
+    PY_CLI="$ROOT/scripts/python-cli.py"
 
-# Node
-NODE_CLI="$ROOT/scripts/node-cli.mjs"
+    # Solidity uses source-tree forge script (needs forge runtime)
+    SOLIDITY_CLI="$ROOT/scripts/solidity-cli.sh"
 
-# C
-(cd "$ROOT/c" && make ecvrf_cli 2>/dev/null) || {
-    red "C build failed"; exit 1
-}
-C_CLI="$ROOT/c/ecvrf_cli"
-
-# C#
-(cd "$ROOT/csharp/Ecvrf.Cli" && dotnet build -c Release --nologo -v q 2>/dev/null) || {
-    red "C# build failed"; exit 1
-}
-CSHARP_CLI_DIR="$ROOT/csharp/Ecvrf.Cli"
-
-# Kotlin
-(cd "$ROOT/kotlin" && ./gradlew installDist --quiet 2>/dev/null) || {
-    red "Kotlin build failed"; exit 1
-}
-KOTLIN_CLI="$ROOT/kotlin/build/install/ecvrf-kotlin/bin/ecvrf-kotlin"
-
-# Haskell
-(cd "$ROOT/haskell" && cabal build ecvrf-cli 2>/dev/null) || {
-    red "Haskell build failed"; exit 1
-}
-HASKELL_CLI="$(cd "$ROOT/haskell" && cabal list-bin ecvrf-cli 2>/dev/null)"
-
-# Zig
-(cd "$ROOT/zig" && zig build -Doptimize=ReleaseFast 2>/dev/null) || {
-    red "Zig build failed"; exit 1
-}
-ZIG_CLI="$ROOT/zig/zig-out/bin/ecvrf-cli"
-
-# Swift (optional — not available on all platforms, e.g. Ubuntu CI)
-SWIFT_AVAILABLE=false
-SWIFT_CLI=""
-if command -v swift &>/dev/null; then
-    if (cd "$ROOT/swift" && swift build -c release --quiet 2>/dev/null); then
-        SWIFT_CLI="$(cd "$ROOT/swift" && swift build -c release --show-bin-path 2>/dev/null)/ecvrf-cli"
+    # Swift (optional — pre-built binary may not exist)
+    SWIFT_AVAILABLE=false
+    SWIFT_CLI=""
+    if [ -x "$ECVRF_BIN_DIR/swift/ecvrf-cli" ]; then
+        SWIFT_CLI="$ECVRF_BIN_DIR/swift/ecvrf-cli"
         SWIFT_AVAILABLE=true
-    else
-        echo "  Swift build failed, skipping"
     fi
-else
-    echo "  Swift toolchain not found, skipping"
-fi
 
-# Solidity (needs forge; install forge-std if missing)
-(cd "$ROOT/solidity" && {
-    [ -d lib/forge-std ] || {
-        git init 2>/dev/null
-        forge install foundry-rs/forge-std --no-git 2>/dev/null
+    # Make downloaded binaries executable
+    for bin in "$GO_CLI" "$RUST_CLI" "$C_CLI" "$HASKELL_CLI" "$ZIG_CLI" "$SOLANA_CLI" "$KOTLIN_CLI"; do
+        [ -f "$bin" ] && chmod +x "$bin"
+    done
+    # Make Kotlin wrapper scripts executable
+    if [ -d "$ECVRF_BIN_DIR/kotlin/bin" ]; then
+        chmod +x "$ECVRF_BIN_DIR/kotlin/bin/"* 2>/dev/null || true
+    fi
+
+    CSHARP_PREBUILT=true
+    bold "Pre-built binaries ready."
+else
+    bold "Building implementations..."
+
+    # Go
+    (cd "$ROOT/go" && go build -o "$ROOT/scripts/.bin/ecvrf-go" ./cmd/ecvrf-cli) || {
+        red "Go build failed"; exit 1
     }
-    forge build --quiet 2>/dev/null
-}) || {
-    red "Solidity build failed"; exit 1
-}
-SOLIDITY_CLI="$ROOT/scripts/solidity-cli.sh"
 
-# Solana (verify-only CLI)
-(cd "$ROOT/solana" && cargo build --example cli --features no-entrypoint --release 2>/dev/null) || {
-    red "Solana build failed"; exit 1
-}
-SOLANA_CLI="$ROOT/solana/target/release/examples/cli"
+    # Rust
+    (cd "$ROOT/rust" && cargo build --example cli --release 2>/dev/null) || {
+        red "Rust build failed"; exit 1
+    }
+    RUST_CLI="$ROOT/rust/target/release/examples/cli"
 
-GO_CLI="$ROOT/scripts/.bin/ecvrf-go"
-PY_CLI="$ROOT/scripts/python-cli.py"
+    # Python venv
+    PYTHON="$ROOT/python/.venv/bin/python3"
+    if [ ! -x "$PYTHON" ]; then
+        PYTHON="python3"
+    fi
 
-if [ "$SWIFT_AVAILABLE" = "true" ]; then
-    bold "All builds succeeded."
-else
-    bold "Builds succeeded (Swift skipped — toolchain not available)."
+    # Node
+    NODE_CLI="$ROOT/scripts/node-cli.mjs"
+
+    # C
+    (cd "$ROOT/c" && make ecvrf_cli 2>/dev/null) || {
+        red "C build failed"; exit 1
+    }
+    C_CLI="$ROOT/c/ecvrf_cli"
+
+    # C#
+    (cd "$ROOT/csharp/Ecvrf.Cli" && dotnet build -c Release --nologo -v q 2>/dev/null) || {
+        red "C# build failed"; exit 1
+    }
+    CSHARP_CLI_DIR="$ROOT/csharp/Ecvrf.Cli"
+
+    # Kotlin
+    (cd "$ROOT/kotlin" && ./gradlew installDist --quiet 2>/dev/null) || {
+        red "Kotlin build failed"; exit 1
+    }
+    KOTLIN_CLI="$ROOT/kotlin/build/install/ecvrf-kotlin/bin/ecvrf-kotlin"
+
+    # Haskell
+    (cd "$ROOT/haskell" && cabal build ecvrf-cli 2>/dev/null) || {
+        red "Haskell build failed"; exit 1
+    }
+    HASKELL_CLI="$(cd "$ROOT/haskell" && cabal list-bin ecvrf-cli 2>/dev/null)"
+
+    # Zig
+    (cd "$ROOT/zig" && zig build -Doptimize=ReleaseFast 2>/dev/null) || {
+        red "Zig build failed"; exit 1
+    }
+    ZIG_CLI="$ROOT/zig/zig-out/bin/ecvrf-cli"
+
+    # Swift (optional — not available on all platforms, e.g. Ubuntu CI)
+    SWIFT_AVAILABLE=false
+    SWIFT_CLI=""
+    if command -v swift &>/dev/null; then
+        if (cd "$ROOT/swift" && swift build -c release --quiet 2>/dev/null); then
+            SWIFT_CLI="$(cd "$ROOT/swift" && swift build -c release --show-bin-path 2>/dev/null)/ecvrf-cli"
+            SWIFT_AVAILABLE=true
+        else
+            echo "  Swift build failed, skipping"
+        fi
+    else
+        echo "  Swift toolchain not found, skipping"
+    fi
+
+    # Solidity (needs forge; install forge-std if missing)
+    (cd "$ROOT/solidity" && {
+        [ -d lib/forge-std ] || {
+            git init 2>/dev/null
+            forge install foundry-rs/forge-std --no-git 2>/dev/null
+        }
+        forge build --quiet 2>/dev/null
+    }) || {
+        red "Solidity build failed"; exit 1
+    }
+    SOLIDITY_CLI="$ROOT/scripts/solidity-cli.sh"
+
+    # Solana (verify-only CLI)
+    (cd "$ROOT/solana" && cargo build --example cli --features no-entrypoint --release 2>/dev/null) || {
+        red "Solana build failed"; exit 1
+    }
+    SOLANA_CLI="$ROOT/solana/target/release/examples/cli"
+
+    GO_CLI="$ROOT/scripts/.bin/ecvrf-go"
+    PY_CLI="$ROOT/scripts/python-cli.py"
+    CSHARP_PREBUILT=false
+
+    if [ "$SWIFT_AVAILABLE" = "true" ]; then
+        bold "All builds succeeded."
+    else
+        bold "Builds succeeded (Swift skipped — toolchain not available)."
+    fi
 fi
 echo ""
 
@@ -182,6 +231,7 @@ node_cli = '$NODE_CLI'
 python = '$PYTHON'
 c_cli = '$C_CLI'
 csharp_dir = '$CSHARP_CLI_DIR'
+csharp_prebuilt = '$CSHARP_PREBUILT' == 'true'
 kotlin_cli = '$KOTLIN_CLI'
 haskell_cli = '$HASKELL_CLI'
 zig_cli = '$ZIG_CLI'
@@ -191,6 +241,11 @@ solidity_cli = '$SOLIDITY_CLI'
 
 pass_count = 0
 fail_count = 0
+
+def csharp_cmd(*args):
+    if csharp_prebuilt:
+        return ['dotnet', 'exec', csharp_dir + '/Ecvrf.Cli.dll'] + list(args)
+    return ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--'] + list(args)
 
 def run_cmd(cmd, cwd=None):
     out = subprocess.check_output(cmd, timeout=120, stderr=subprocess.DEVNULL, cwd=cwd)
@@ -214,7 +269,7 @@ for i, vec in enumerate(vectors):
         'rust':       [rust_cli, 'prove', sk] + aa,
         'typescript': ['node', node_cli, 'prove', sk] + aa,
         'c':          [c_cli, 'prove', sk] + aa,
-        'csharp':     ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--', 'prove', sk] + aa,
+        'csharp':     csharp_cmd('prove', sk) + aa,
         'kotlin':     [kotlin_cli, 'prove', sk] + aa,
         'haskell':    [haskell_cli, 'prove', sk] + aa,
         'zig':        [zig_cli, 'prove', sk] + aa,
@@ -287,6 +342,7 @@ node_cli = '$NODE_CLI'
 python = '$PYTHON'
 c_cli = '$C_CLI'
 csharp_dir = '$CSHARP_CLI_DIR'
+csharp_prebuilt = '$CSHARP_PREBUILT' == 'true'
 kotlin_cli = '$KOTLIN_CLI'
 haskell_cli = '$HASKELL_CLI'
 zig_cli = '$ZIG_CLI'
@@ -294,6 +350,11 @@ swift_cli = '$SWIFT_CLI'
 swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
 solana_cli = '$SOLANA_CLI'
+
+def csharp_cmd(*args):
+    if csharp_prebuilt:
+        return ['dotnet', 'exec', csharp_dir + '/Ecvrf.Cli.dll'] + list(args)
+    return ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--'] + list(args)
 
 prover_impls = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig', 'solidity']
 if swift_available:
@@ -307,7 +368,7 @@ def prove_cmd(impl, sk, aa):
         'rust':       [rust_cli, 'prove', sk] + aa,
         'typescript': ['node', node_cli, 'prove', sk] + aa,
         'c':          [c_cli, 'prove', sk] + aa,
-        'csharp':     ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--', 'prove', sk] + aa,
+        'csharp':     csharp_cmd('prove', sk) + aa,
         'kotlin':     [kotlin_cli, 'prove', sk] + aa,
         'haskell':    [haskell_cli, 'prove', sk] + aa,
         'zig':        [zig_cli, 'prove', sk] + aa,
@@ -324,7 +385,7 @@ def verify_cmd(impl, pk, pi, aa):
         'rust':       [rust_cli, 'verify', pk, pi] + aa,
         'typescript': ['node', node_cli, 'verify', pk, pi] + aa,
         'c':          [c_cli, 'verify', pk, pi] + aa,
-        'csharp':     ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--', 'verify', pk, pi] + aa,
+        'csharp':     csharp_cmd('verify', pk, pi) + aa,
         'kotlin':     [kotlin_cli, 'verify', pk, pi] + aa,
         'haskell':    [haskell_cli, 'verify', pk, pi] + aa,
         'zig':        [zig_cli, 'verify', pk, pi] + aa,
@@ -410,6 +471,7 @@ node_cli = '$NODE_CLI'
 python = '$PYTHON'
 c_cli = '$C_CLI'
 csharp_dir = '$CSHARP_CLI_DIR'
+csharp_prebuilt = '$CSHARP_PREBUILT' == 'true'
 kotlin_cli = '$KOTLIN_CLI'
 haskell_cli = '$HASKELL_CLI'
 zig_cli = '$ZIG_CLI'
@@ -417,6 +479,11 @@ swift_cli = '$SWIFT_CLI'
 swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
 solana_cli = '$SOLANA_CLI'
+
+def csharp_cmd(*args):
+    if csharp_prebuilt:
+        return ['dotnet', 'exec', csharp_dir + '/Ecvrf.Cli.dll'] + list(args)
+    return ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--'] + list(args)
 
 verifier_names = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig', 'solidity', 'solana']
 if swift_available:
@@ -429,7 +496,7 @@ def verify_cmd(impl, pk, pi, aa):
         'rust':       [rust_cli, 'verify', pk, pi] + aa,
         'typescript': ['node', node_cli, 'verify', pk, pi] + aa,
         'c':          [c_cli, 'verify', pk, pi] + aa,
-        'csharp':     ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--', 'verify', pk, pi] + aa,
+        'csharp':     csharp_cmd('verify', pk, pi) + aa,
         'kotlin':     [kotlin_cli, 'verify', pk, pi] + aa,
         'haskell':    [haskell_cli, 'verify', pk, pi] + aa,
         'zig':        [zig_cli, 'verify', pk, pi] + aa,
