@@ -259,15 +259,8 @@ swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
 solidity_available = '$SOLIDITY_AVAILABLE' == 'true'
 
-optional_impls = set()
-if solidity_available:
-    optional_impls.add('solidity')
-if swift_available:
-    optional_impls.add('swift')
-
 pass_count = 0
 fail_count = 0
-warn_count = 0
 
 def csharp_cmd(*args):
     if csharp_prebuilt:
@@ -314,47 +307,29 @@ for i, vec in enumerate(vectors):
         except Exception as e:
             results[lang] = {'error': str(e)}
 
-    hard_fail = False
-    soft_fail = False
+    failed = False
     for lang, res in results.items():
-        is_optional = lang in optional_impls
         if 'error' in res:
-            if is_optional:
-                print(f'    \033[0;33mWARN {lang}: {res[\"error\"]} (optional, non-fatal)\033[0m')
-                soft_fail = True
-            else:
-                print(f'    \033[0;31mFAIL {lang}: {res[\"error\"]}\033[0m')
-                hard_fail = True
+            print(f'    \033[0;31mFAIL {lang}: {res[\"error\"]}\033[0m')
+            failed = True
             continue
         if res['pi'] != expected_pi:
-            if is_optional:
-                print(f'    \033[0;33mWARN {lang} pi mismatch (optional, non-fatal)\033[0m')
-                soft_fail = True
-            else:
-                print(f'    \033[0;31mFAIL {lang} pi mismatch\033[0m')
-                print(f'      expected: {expected_pi}')
-                print(f'      got:      {res[\"pi\"]}')
-                hard_fail = True
+            print(f'    \033[0;31mFAIL {lang} pi mismatch\033[0m')
+            print(f'      expected: {expected_pi}')
+            print(f'      got:      {res[\"pi\"]}')
+            failed = True
         if res['beta'] != expected_beta:
-            if is_optional:
-                print(f'    \033[0;33mWARN {lang} beta mismatch (optional, non-fatal)\033[0m')
-                soft_fail = True
-            else:
-                print(f'    \033[0;31mFAIL {lang} beta mismatch\033[0m')
-                hard_fail = True
+            print(f'    \033[0;31mFAIL {lang} beta mismatch\033[0m')
+            failed = True
 
-    if hard_fail:
+    if failed:
         fail_count += 1
-    elif soft_fail:
-        warn_count += 1
-        print(f'    \033[0;32mPASS — required implementations match\033[0m')
-        pass_count += 1
     else:
         print(f'    \033[0;32mPASS — all {NUM_PROVERS} implementations match\033[0m')
         pass_count += 1
 
 print()
-print(f'  Phase 1 results: {pass_count} passed, {fail_count} failed' + (f', {warn_count} warnings (optional)' if warn_count else ''))
+print(f'  Phase 1 results: {pass_count} passed, {fail_count} failed')
 if fail_count > 0:
     sys.exit(1)
 "
@@ -447,19 +422,12 @@ def verify_cmd(impl, pk, pi, aa):
         cmds['swift'] = [swift_cli, 'verify', pk, pi] + aa
     return cmds[impl]
 
-optional_impls = set()
-if solidity_available:
-    optional_impls.add('solidity')
-if swift_available:
-    optional_impls.add('swift')
-
 def run_cmd(cmd):
     out = subprocess.check_output(cmd, timeout=120, stderr=subprocess.DEVNULL)
     return json.loads(out)
 
 pass_count = 0
 fail_count = 0
-warn_count = 0
 
 for vec in vectors[:3]:
     sk = vec['sk']
@@ -471,46 +439,30 @@ for vec in vectors[:3]:
     print(f'  Vector: {label}')
 
     vec_failed = False
-    vec_warned = False
     for prover in prover_impls:
-        is_optional_prover = prover in optional_impls
         aa = alpha_args(alpha)
         try:
             proof = run_cmd(prove_cmd(prover, sk, aa))
         except Exception as e:
-            if is_optional_prover:
-                print(f'    \033[0;33mWARN {prover} prove failed (optional, non-fatal): {e}\033[0m')
-                vec_warned = True
-                continue
-            else:
-                print(f'    \033[0;31mFAIL {prover} prove failed: {e}\033[0m')
-                vec_failed = True
-                continue
+            print(f'    \033[0;31mFAIL {prover} prove failed: {e}\033[0m')
+            vec_failed = True
+            continue
         pi = proof['pi']
 
         for verifier in verifier_impls:
-            is_optional_pair = prover in optional_impls or verifier in optional_impls
             aa = alpha_args(alpha)
             try:
                 result = run_cmd(verify_cmd(verifier, pk, pi, aa))
             except Exception as e:
-                if is_optional_pair:
-                    print(f'    \033[0;33mWARN {prover} -> {verifier} failed (optional, non-fatal)\033[0m')
-                    vec_warned = True
-                    continue
-                else:
-                    fail_count += 1
-                    vec_failed = True
-                    print(f'    \033[0;31mFAIL {prover} -> {verifier}: {e}\033[0m')
-                    continue
+                fail_count += 1
+                vec_failed = True
+                print(f'    \033[0;31mFAIL {prover} -> {verifier}: {e}\033[0m')
+                continue
             ok = result['valid'] and result.get('beta') == expected_beta
 
             tag = f'{prover} -> {verifier}'
             if ok:
                 pass_count += 1
-            elif is_optional_pair:
-                print(f'    \033[0;33mWARN {tag}: valid={result[\"valid\"]}, beta={result.get(\"beta\")} (optional, non-fatal)\033[0m')
-                vec_warned = True
             else:
                 fail_count += 1
                 vec_failed = True
@@ -518,11 +470,9 @@ for vec in vectors[:3]:
 
     if not vec_failed:
         print(f'    \033[0;32mPASS — all {len(prover_impls)}x{len(verifier_impls)} cross-verifications passed\033[0m')
-    if vec_warned:
-        warn_count += 1
 
 print()
-print(f'  Phase 2 results: {pass_count} passed, {fail_count} failed' + (f', {warn_count} vector(s) with optional warnings' if warn_count else ''))
+print(f'  Phase 2 results: {pass_count} passed, {fail_count} failed')
 if fail_count > 0:
     sys.exit(1)
 "
@@ -599,15 +549,8 @@ def verify_cmd(impl, pk, pi, aa):
         cmds['swift'] = [swift_cli, 'verify', pk, pi] + aa
     return cmds[impl]
 
-optional_impls = set()
-if solidity_available:
-    optional_impls.add('solidity')
-if swift_available:
-    optional_impls.add('swift')
-
 pass_count = 0
 fail_count = 0
-warn_count = 0
 
 for vec in neg_vectors:
     pk = vec['pk']
@@ -616,7 +559,6 @@ for vec in neg_vectors:
     desc = vec['description']
 
     results = {}
-    optional_errors = []
     aa = alpha_args(alpha)
 
     for name in verifier_names:
@@ -626,34 +568,18 @@ for vec in neg_vectors:
         except subprocess.CalledProcessError:
             results[name] = {'valid': False, 'beta': None}
         except Exception as e:
-            if name in optional_impls:
-                optional_errors.append(name)
-                results[name] = {'valid': False, 'beta': None}
-            else:
-                results[name] = {'valid': True, 'error': str(e)}
+            results[name] = {'valid': True, 'error': str(e)}
 
-    required_results = {n: r for n, r in results.items() if n not in optional_impls}
-    all_required_rejected = all(not r.get('valid', True) for r in required_results.values())
-    optional_results = {n: r for n, r in results.items() if n in optional_impls and n not in optional_errors}
-    all_optional_rejected = all(not r.get('valid', True) for r in optional_results.values())
+    all_rejected = all(not r.get('valid', True) for r in results.values())
 
-    if all_required_rejected and all_optional_rejected:
+    if all_rejected:
         pass_count += 1
-        if optional_errors:
-            warn_count += 1
-    elif not all_required_rejected:
-        fail_count += 1
-        accepted_by = [n for n, r in required_results.items() if r.get('valid', False)]
-        print(f'  \033[0;31mFAIL \"{desc}\" accepted by: {accepted_by}\033[0m')
     else:
-        accepted_by = [n for n, r in optional_results.items() if r.get('valid', False)]
-        print(f'  \033[0;33mWARN \"{desc}\" accepted by optional: {accepted_by} (non-fatal)\033[0m')
-        warn_count += 1
-        pass_count += 1
+        fail_count += 1
+        accepted_by = [n for n, r in results.items() if r.get('valid', False)]
+        print(f'  \033[0;31mFAIL \"{desc}\" accepted by: {accepted_by}\033[0m')
 
-print(f'  {pass_count}/{len(neg_vectors)} negative vectors correctly rejected by all required implementations')
-if warn_count > 0:
-    print(f'  ({warn_count} with optional implementation warnings)')
+print(f'  {pass_count}/{len(neg_vectors)} negative vectors correctly rejected by all implementations')
 if fail_count > 0:
     sys.exit(1)
 else:

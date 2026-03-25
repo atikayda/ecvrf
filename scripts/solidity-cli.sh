@@ -3,7 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 _stderr=$(mktemp)
-trap 'rm -f "$_stderr"' EXIT
+_alpha_file="$ROOT/solidity/.ecvrf-alpha"
+trap 'rm -f "$_stderr" "$_alpha_file"' EXIT
 
 read_alpha() {
     if [ "$1" = "--alpha-file" ]; then
@@ -18,8 +19,9 @@ CMD="$1"; shift
 if [ "$CMD" = "prove" ]; then
     SK="$1"; shift
     ALPHA="$(read_alpha "$@")"
+    printf '%s' "0x$ALPHA" > "$_alpha_file"
     OUTPUT=$(cd "$ROOT/solidity" && \
-        ECVRF_CMD=prove ECVRF_SK="0x$SK" ECVRF_ALPHA="0x$ALPHA" \
+        ECVRF_CMD=prove ECVRF_SK="0x$SK" ECVRF_ALPHA_FILE="$_alpha_file" \
         forge script script/Cli.s.sol -v 2>"$_stderr") || {
         echo "forge script failed (prove):" >&2
         cat "$_stderr" >&2
@@ -34,8 +36,9 @@ elif [ "$CMD" = "verify" ]; then
     PK="$1"; shift
     PI="$1"; shift
     ALPHA="$(read_alpha "$@")"
+    printf '%s' "0x$ALPHA" > "$_alpha_file"
     OUTPUT=$(cd "$ROOT/solidity" && \
-        ECVRF_CMD=verify ECVRF_PK="0x$PK" ECVRF_PI="0x$PI" ECVRF_ALPHA="0x$ALPHA" \
+        ECVRF_CMD=verify ECVRF_PK="0x$PK" ECVRF_PI="0x$PI" ECVRF_ALPHA_FILE="$_alpha_file" \
         forge script script/Cli.s.sol -v 2>"$_stderr") || true
     LINE=$(echo "$OUTPUT" | grep 'ECVRF_OUT:' | head -1 | sed 's/^[[:space:]]*//')
     if [ -z "$LINE" ]; then

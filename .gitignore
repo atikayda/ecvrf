@@ -66,6 +66,7 @@ swift/Package.resolved
 solidity/out/
 solidity/cache/
 solidity/lib/
+solidity/.ecvrf-alpha
 
 # Solana
 solana/target/
