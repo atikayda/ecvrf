@@ -49,9 +49,6 @@ csharp/**/obj/
 kotlin/.gradle/
 kotlin/.kotlin/
 kotlin/build/
-kotlin/gradle/
-kotlin/gradlew
-kotlin/gradlew.bat
 
 # Haskell
 haskell/dist-newstyle/
