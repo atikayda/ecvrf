@@ -36,6 +36,30 @@ But if you're working in the Bitcoin, Ethereum, or broader fintech ecosystem, yo
 
 The short version: secp256k1 isn't a better curve than Ed25519 or P-256 in the abstract. It's the right curve when your existing infrastructure, regulatory environment, and key management are already built around it.
 
+## Existing Implementations Landscape
+
+As of March 2026, there are 18 known secp256k1 VRF implementations across the ecosystem. None target the final RFC 9381 standard. Every one follows an earlier draft or a custom specification.
+
+| Spec Version | Implementation | Language | Notes |
+|---|---|---|---|
+| draft-04 | witnet/vrf-solidity | Solidity | On-chain verifier, experimental |
+| draft-05 | aergoio/secp256k1-vrf | C | Fork of bitcoin-core/secp256k1, Aergo blockchain |
+| draft-05 | koinos/secp256k1-vrf | C | Fork of aergoio, Koinos blockchain consensus |
+| draft-05 | witnet/vrf-rs | Rust | crates.io, Witnet oracle network, multi-curve support |
+| draft-05 | roaminro/ecvrf | JS/TS | npm @roamin/ecvrf |
+| draft-06 | vechain/go-ecvrf | Go | VeChain blockchain |
+| draft-10 | TimeleapLabs/node-ecvrf | Node.js | npm @kenshi.io/node-ecvrf |
+| Custom | Chainlink VRF v1/v2 | Go + Solidity | Most widely deployed VRF in production, proprietary spec |
+| Custom | orochi-network/libecvrf | Rust | Uses keccak256 instead of SHA-256 for EVM optimization |
+
+Draft-05 is the most common base. The aergoio fork of bitcoin-core/secp256k1 is the root of several downstream implementations. bitcoin-core/secp256k1 itself explicitly rejected adding VRF support (Issue #706).
+
+No secp256k1 VRF implementations exist on PyPI, and none were found in C#, Haskell, Swift, Kotlin, or Zig.
+
+These implementations serve their ecosystems well - Chainlink's VRF alone secures billions of dollars in on-chain randomness. The gap is not quality. The gap is that every implementation follows a different draft or a custom spec, and none follow the ratified standard. An application using aergoio's draft-05 output cannot verify a proof from vechain's draft-06 implementation, which cannot verify a proof from Chainlink's custom construction. The differences documented in [Draft-05/06 vs RFC 9381](#draft-0506-vs-rfc-9381---quick-reference) are not cosmetic - they produce incompatible outputs.
+
+This project provides the first RFC 9381-compliant secp256k1 VRF implementation. As the IETF standard gains adoption, interoperability will require RFC 9381 compliance - not compatibility with any single draft.
+
 ## How We Know It's Correct
 
 The Python implementation serves as the reference oracle. Before generating any secp256k1 vectors, the oracle validates its algorithm logic against the RFC 9381 Appendix B test vectors for P-256 (ECVRF-P256-SHA256-TAI). Byte-identical output on the published P-256 vectors proves the algorithm is correct. Only then does it generate secp256k1 vectors.
