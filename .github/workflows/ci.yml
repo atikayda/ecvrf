@@ -116,9 +116,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
       - name: Run tests
         working-directory: kotlin
-        run: ./gradlew test
+        run: gradle test
 
   haskell:
     name: Haskell tests
@@ -133,8 +134,8 @@ jobs:
         working-directory: haskell
         run: |
           cabal update
-          cabal build all
-          cabal run ecvrf-test
+          cabal build all --enable-tests
+          cabal test --test-show-details=direct
 
   zig:
     name: Zig tests
@@ -165,6 +166,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: foundry-rs/foundry-toolchain@v1
+      - name: Install dependencies
+        working-directory: solidity
+        run: forge install
       - name: Run tests
         working-directory: solidity
         run: forge test
