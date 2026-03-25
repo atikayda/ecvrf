@@ -334,6 +334,12 @@ jobs:
           git init
           forge install foundry-rs/forge-std --no-git
 
+      - name: Install TypeScript runtime deps
+        working-directory: typescript
+        run: npm ci
+      - name: Link TypeScript deps to artifact
+        run: ln -s "${{ github.workspace }}/typescript/node_modules" artifacts/typescript/node_modules
+
       - name: Run cross-validation
         env:
           ECVRF_BIN_DIR: ${{ github.workspace }}/artifacts

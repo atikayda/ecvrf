@@ -75,6 +75,10 @@ if [ -n "${ECVRF_BIN_DIR:-}" ]; then
     if [ -d "$ECVRF_BIN_DIR/kotlin/bin" ]; then
         chmod +x "$ECVRF_BIN_DIR/kotlin/bin/"* 2>/dev/null || true
     fi
+    # Make source-tree scripts executable (git perms may not survive all CI environments)
+    for script in "$SOLIDITY_CLI" "$PY_CLI"; do
+        [ -f "$script" ] && chmod +x "$script"
+    done
 
     CSHARP_PREBUILT=true
     bold "Pre-built binaries ready."
