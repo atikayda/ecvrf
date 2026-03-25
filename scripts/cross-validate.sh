@@ -84,7 +84,16 @@ echo ""
 # ── Phase 1: Prove Identity ───────────────────────────────────────────
 
 "$PYTHON" -c "
-import json, subprocess, sys, os
+import json, subprocess, sys, os, tempfile, atexit
+
+_alpha_fd, _alpha_path = tempfile.mkstemp(prefix='ecvrf-alpha-')
+os.close(_alpha_fd)
+atexit.register(lambda: os.path.exists(_alpha_path) and os.unlink(_alpha_path))
+
+def alpha_args(alpha_hex):
+    with open(_alpha_path, 'w') as f:
+        f.write(alpha_hex)
+    return ['--alpha-file', _alpha_path]
 
 with open('$SUBSET_FILE') as f:
     vectors = json.load(f)
@@ -108,31 +117,32 @@ for i, vec in enumerate(vectors):
     print(f'  Vector {i}: {label}')
 
     results = {}
+    aa = alpha_args(alpha)
 
     # Go
     try:
-        out = subprocess.check_output([go_cli, 'prove', sk, alpha], timeout=30)
+        out = subprocess.check_output([go_cli, 'prove', sk] + aa, timeout=30)
         results['go'] = json.loads(out)
     except Exception as e:
         results['go'] = {'error': str(e)}
 
     # Python
     try:
-        out = subprocess.check_output([python, py_cli, 'prove', sk, alpha], timeout=30)
+        out = subprocess.check_output([python, py_cli, 'prove', sk] + aa, timeout=30)
         results['python'] = json.loads(out)
     except Exception as e:
         results['python'] = {'error': str(e)}
 
     # Rust
     try:
-        out = subprocess.check_output([rust_cli, 'prove', sk, alpha], timeout=30)
+        out = subprocess.check_output([rust_cli, 'prove', sk] + aa, timeout=30)
         results['rust'] = json.loads(out)
     except Exception as e:
         results['rust'] = {'error': str(e)}
 
     # TypeScript
     try:
-        out = subprocess.check_output(['node', node_cli, 'prove', sk, alpha], timeout=30)
+        out = subprocess.check_output(['node', node_cli, 'prove', sk] + aa, timeout=30)
         results['typescript'] = json.loads(out)
     except Exception as e:
         results['typescript'] = {'error': str(e)}
@@ -173,7 +183,16 @@ echo ""
 # ── Phase 2: Cross-Verification ───────────────────────────────────────
 
 "$PYTHON" -c "
-import json, subprocess, sys
+import json, subprocess, sys, os, tempfile, atexit
+
+_alpha_fd, _alpha_path = tempfile.mkstemp(prefix='ecvrf-alpha-')
+os.close(_alpha_fd)
+atexit.register(lambda: os.path.exists(_alpha_path) and os.unlink(_alpha_path))
+
+def alpha_args(alpha_hex):
+    with open(_alpha_path, 'w') as f:
+        f.write(alpha_hex)
+    return ['--alpha-file', _alpha_path]
 
 with open('$SUBSET_FILE') as f:
     vectors = json.load(f)
@@ -187,25 +206,27 @@ python = '$PYTHON'
 impls = ['go', 'python', 'rust', 'typescript']
 
 def do_prove(impl_name, sk, alpha):
+    aa = alpha_args(alpha)
     if impl_name == 'go':
-        out = subprocess.check_output([go_cli, 'prove', sk, alpha], timeout=30)
+        out = subprocess.check_output([go_cli, 'prove', sk] + aa, timeout=30)
     elif impl_name == 'python':
-        out = subprocess.check_output([python, py_cli, 'prove', sk, alpha], timeout=30)
+        out = subprocess.check_output([python, py_cli, 'prove', sk] + aa, timeout=30)
     elif impl_name == 'rust':
-        out = subprocess.check_output([rust_cli, 'prove', sk, alpha], timeout=30)
+        out = subprocess.check_output([rust_cli, 'prove', sk] + aa, timeout=30)
     elif impl_name == 'typescript':
-        out = subprocess.check_output(['node', node_cli, 'prove', sk, alpha], timeout=30)
+        out = subprocess.check_output(['node', node_cli, 'prove', sk] + aa, timeout=30)
     return json.loads(out)
 
 def do_verify(impl_name, pk, pi, alpha):
+    aa = alpha_args(alpha)
     if impl_name == 'go':
-        out = subprocess.check_output([go_cli, 'verify', pk, pi, alpha], timeout=30)
+        out = subprocess.check_output([go_cli, 'verify', pk, pi] + aa, timeout=30)
     elif impl_name == 'python':
-        out = subprocess.check_output([python, py_cli, 'verify', pk, pi, alpha], timeout=30)
+        out = subprocess.check_output([python, py_cli, 'verify', pk, pi] + aa, timeout=30)
     elif impl_name == 'rust':
-        out = subprocess.check_output([rust_cli, 'verify', pk, pi, alpha], timeout=30)
+        out = subprocess.check_output([rust_cli, 'verify', pk, pi] + aa, timeout=30)
     elif impl_name == 'typescript':
-        out = subprocess.check_output(['node', node_cli, 'verify', pk, pi, alpha], timeout=30)
+        out = subprocess.check_output(['node', node_cli, 'verify', pk, pi] + aa, timeout=30)
     return json.loads(out)
 
 pass_count = 0
@@ -255,7 +276,16 @@ echo ""
 # ── Phase 3: Negative Vector Rejection ────────────────────────────────
 
 "$PYTHON" -c "
-import json, subprocess, sys
+import json, subprocess, sys, os, tempfile, atexit
+
+_alpha_fd, _alpha_path = tempfile.mkstemp(prefix='ecvrf-alpha-')
+os.close(_alpha_fd)
+atexit.register(lambda: os.path.exists(_alpha_path) and os.unlink(_alpha_path))
+
+def alpha_args(alpha_hex):
+    with open(_alpha_path, 'w') as f:
+        f.write(alpha_hex)
+    return ['--alpha-file', _alpha_path]
 
 with open('$VECTORS') as f:
     data = json.load(f)
@@ -278,12 +308,13 @@ for vec in neg_vectors:
     desc = vec['description']
 
     results = {}
+    aa = alpha_args(alpha)
 
     for name, cmd in [
-        ('go', [go_cli, 'verify', pk, pi, alpha]),
-        ('python', [python, py_cli, 'verify', pk, pi, alpha]),
-        ('rust', [rust_cli, 'verify', pk, pi, alpha]),
-        ('typescript', ['node', node_cli, 'verify', pk, pi, alpha]),
+        ('go', [go_cli, 'verify', pk, pi] + aa),
+        ('python', [python, py_cli, 'verify', pk, pi] + aa),
+        ('rust', [rust_cli, 'verify', pk, pi] + aa),
+        ('typescript', ['node', node_cli, 'verify', pk, pi] + aa),
     ]:
         try:
             out = subprocess.check_output(cmd, timeout=30, stderr=subprocess.DEVNULL)

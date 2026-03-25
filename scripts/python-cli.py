@@ -13,6 +13,13 @@ from ecvrf import (
 )
 
 
+def read_alpha(args: list, idx: int) -> str:
+    """Read alpha hex from --alpha-file flag or positional argument."""
+    if args[idx] == "--alpha-file":
+        return Path(args[idx + 1]).read_text().strip()
+    return args[idx]
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print("usage: python-cli.py prove|verify ...", file=sys.stderr)
@@ -21,13 +28,15 @@ def main() -> None:
     cmd = sys.argv[1]
 
     if cmd == "prove":
-        sk_hex, alpha_hex = sys.argv[2], sys.argv[3]
+        sk_hex = sys.argv[2]
+        alpha_hex = read_alpha(sys.argv, 3)
         pi = ecvrf_prove(SUITE, bytes.fromhex(sk_hex), bytes.fromhex(alpha_hex))
         beta = ecvrf_proof_to_hash(SUITE, pi)
         print(json.dumps({"pi": pi.hex(), "beta": beta.hex()}))
 
     elif cmd == "verify":
-        pk_hex, pi_hex, alpha_hex = sys.argv[2], sys.argv[3], sys.argv[4]
+        pk_hex, pi_hex = sys.argv[2], sys.argv[3]
+        alpha_hex = read_alpha(sys.argv, 4)
         valid, beta = ecvrf_verify(
             SUITE,
             bytes.fromhex(pk_hex),

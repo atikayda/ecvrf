@@ -10,9 +10,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/atikayda/ecvrf"
 )
+
+func readAlpha(args []string, idx int) (string, error) {
+	if args[idx] == "--alpha-file" {
+		data, err := os.ReadFile(args[idx+1])
+		if err != nil {
+			return "", fmt.Errorf("reading alpha file: %w", err)
+		}
+		return strings.TrimSpace(string(data)), nil
+	}
+	return args[idx], nil
+}
 
 func main() {
 	if len(os.Args) < 2 {
@@ -22,8 +34,8 @@ func main() {
 
 	switch os.Args[1] {
 	case "prove":
-		if len(os.Args) != 4 {
-			fmt.Fprintln(os.Stderr, "usage: ecvrf-cli prove <sk_hex> <alpha_hex>")
+		if len(os.Args) < 4 {
+			fmt.Fprintln(os.Stderr, "usage: ecvrf-cli prove <sk_hex> <alpha_hex|--alpha-file path>")
 			os.Exit(1)
 		}
 		sk, err := hex.DecodeString(os.Args[2])
@@ -31,7 +43,12 @@ func main() {
 			fmt.Fprintf(os.Stderr, "invalid sk hex: %v\n", err)
 			os.Exit(1)
 		}
-		alpha, err := hex.DecodeString(os.Args[3])
+		alphaHex, err := readAlpha(os.Args, 3)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		alpha, err := hex.DecodeString(alphaHex)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "invalid alpha hex: %v\n", err)
 			os.Exit(1)
@@ -53,8 +70,8 @@ func main() {
 		fmt.Println(string(out))
 
 	case "verify":
-		if len(os.Args) != 5 {
-			fmt.Fprintln(os.Stderr, "usage: ecvrf-cli verify <pk_hex> <pi_hex> <alpha_hex>")
+		if len(os.Args) < 5 {
+			fmt.Fprintln(os.Stderr, "usage: ecvrf-cli verify <pk_hex> <pi_hex> <alpha_hex|--alpha-file path>")
 			os.Exit(1)
 		}
 		pk, err := hex.DecodeString(os.Args[2])
@@ -67,7 +84,12 @@ func main() {
 			fmt.Fprintf(os.Stderr, "invalid pi hex: %v\n", err)
 			os.Exit(1)
 		}
-		alpha, err := hex.DecodeString(os.Args[4])
+		alphaHex, err := readAlpha(os.Args, 4)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		alpha, err := hex.DecodeString(alphaHex)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "invalid alpha hex: %v\n", err)
 			os.Exit(1)

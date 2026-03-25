@@ -15,6 +15,17 @@ fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+fn read_alpha(args: &[String], idx: usize) -> String {
+    if args[idx] == "--alpha-file" {
+        std::fs::read_to_string(&args[idx + 1])
+            .expect("failed to read alpha file")
+            .trim()
+            .to_string()
+    } else {
+        args[idx].clone()
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -25,7 +36,7 @@ fn main() {
     match args[1].as_str() {
         "prove" => {
             let sk_bytes = hex_decode(&args[2]);
-            let alpha = hex_decode(&args[3]);
+            let alpha = hex_decode(&read_alpha(&args, 3));
             let sk: [u8; 32] = sk_bytes.try_into().expect("sk must be 32 bytes");
             let pi = ecvrf::prove(&sk, &alpha).expect("prove failed");
             let beta = ecvrf::proof_to_hash(&pi).expect("proof_to_hash failed");
@@ -38,7 +49,7 @@ fn main() {
         "verify" => {
             let pk = hex_decode(&args[2]);
             let pi = hex_decode(&args[3]);
-            let alpha = hex_decode(&args[4]);
+            let alpha = hex_decode(&read_alpha(&args, 4));
             match ecvrf::verify(&pk, &pi, &alpha) {
                 Ok(beta) => println!(r#"{{"valid":true,"beta":"{}"}}"#, hex_encode(&beta)),
                 Err(_) => println!(r#"{{"valid":false,"beta":null}}"#),
