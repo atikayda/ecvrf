@@ -1,0 +1,33 @@
+# Working directory (plans, requirements, internal docs)
+working/
+
+# OS files
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Build outputs
+scripts/.bin/
+
+# Go
+/go/bin/
+
+# Rust
+/rust/target/
+
+# TypeScript/Node
+node_modules/
+dist/
+*.js.map

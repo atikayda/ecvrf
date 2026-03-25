@@ -1,0 +1,40 @@
+{
+  "name": "ecvrf-secp256k1-sha256-tai",
+  "version": "0.1.0",
+  "description": "RFC 9381 ECVRF-SECP256K1-SHA256-TAI — Verifiable Random Function",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/ecvrf.js",
+      "types": "./dist/ecvrf.d.ts"
+    }
+  },
+  "main": "./dist/ecvrf.js",
+  "types": "./dist/ecvrf.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test test/ecvrf.test.js",
+    "pretest": "tsc"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atikayda/ecvrf.git",
+    "directory": "typescript"
+  },
+  "homepage": "https://github.com/atikayda/ecvrf",
+  "keywords": ["vrf", "ecvrf", "secp256k1", "rfc9381", "cryptography"]
+}

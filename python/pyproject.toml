@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecvrf"
+version = "0.1.0"
+description = "RFC 9381 ECVRF-SECP256K1-SHA256-TAI reference implementation"
+requires-python = ">= 3.12"
+license = "MIT"
+dependencies = [
+    "ecdsa >= 0.18.0",
+]

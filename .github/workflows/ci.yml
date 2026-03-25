@@ -1,0 +1,115 @@
+name: ECVRF Cross-Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  oracle-drift:
+    name: Oracle drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python deps
+        run: pip install -r python/requirements.txt
+      - name: Validate oracle against P-256 RFC vectors
+        working-directory: python
+        run: python ecvrf.py
+      - name: Regenerate vectors and diff
+        run: |
+          cd python
+          python generate.py
+          cd ..
+          git diff --exit-code vectors/vectors.json
+
+  python:
+    name: Python oracle self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install -r python/requirements.txt
+      - name: Validate P-256 vectors
+        working-directory: python
+        run: python ecvrf.py
+
+  go:
+    name: Go tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Run tests
+        working-directory: go
+        run: go test -v -count=1 ./...
+
+  rust:
+    name: Rust tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Run tests
+        working-directory: rust
+        run: cargo test --release -- --nocapture
+
+  typescript:
+    name: TypeScript tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Install deps
+        working-directory: typescript
+        run: npm ci
+      - name: Build and test
+        working-directory: typescript
+        run: npm test
+
+  cross-validate:
+    name: Cross-implementation validation
+    needs: [python, go, rust, typescript]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Install Python deps
+        run: pip install -r python/requirements.txt
+      - name: Install TypeScript deps
+        working-directory: typescript
+        run: npm ci
+      - name: Build TypeScript
+        working-directory: typescript
+        run: npm run build
+      - name: Run cross-validation
+        run: bash scripts/cross-validate.sh

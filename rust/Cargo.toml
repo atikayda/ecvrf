@@ -1,0 +1,21 @@
+[package]
+name = "ecvrf"
+version = "0.1.0"
+edition = "2021"
+description = "RFC 9381 ECVRF-SECP256K1-SHA256-TAI implementation"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/atikayda/ecvrf"
+homepage = "https://github.com/atikayda/ecvrf"
+keywords = ["vrf", "ecvrf", "secp256k1", "rfc9381", "cryptography"]
+categories = ["cryptography", "no-std"]
+
+[dependencies]
+k256 = { version = "0.13", default-features = false, features = ["arithmetic", "std", "precomputed-tables"] }
+sha2 = "0.10"
+hmac = "0.12"
+thiserror = "2"
+
+[dev-dependencies]
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
