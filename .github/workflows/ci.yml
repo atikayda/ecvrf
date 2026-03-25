@@ -203,10 +203,30 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: rust
+          workspaces: |
+            rust
+            solana
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
+      - name: Install OpenSSL dev headers
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: haskell-actions/setup@v2
+        with:
+          ghc-version: "9.10"
+          cabal-version: latest
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+      - uses: foundry-rs/foundry-toolchain@v1
       - name: Install Python deps
         run: pip install -r python/requirements.txt
       - name: Install TypeScript deps
@@ -215,5 +235,12 @@ jobs:
       - name: Build TypeScript
         working-directory: typescript
         run: npm run build
+      - name: Cabal update
+        run: cabal update
+      - name: Install Solidity dependencies
+        working-directory: solidity
+        run: |
+          git init
+          forge install foundry-rs/forge-std --no-git
       - name: Run cross-validation
         run: bash scripts/cross-validate.sh
