@@ -20,6 +20,22 @@ Including the public key `Y` in `challenge_generation` prevents rogue-key attack
 
 RFC 9381 publishes test vectors for P-256 and Ed25519 but none for secp256k1. This project fills both gaps - a correct RFC 9381 implementation for secp256k1, and the test vectors to prove it.
 
+## Why secp256k1?
+
+Ed25519 and P-256 both have RFC 9381 suites with published test vectors. They're good curves. If your system already uses one of them, you should probably use the matching VRF suite and skip this section entirely.
+
+But if you're working in the Bitcoin, Ethereum, or broader fintech ecosystem, your infrastructure already speaks secp256k1 - and that changes the calculus.
+
+**Regulatory and auditor familiarity.** If your VRF underpins a fairness system - sweepstakes, gaming, any context where an external auditor or regulator needs to verify the randomness is unbiased - the choice of curve matters beyond just security properties. secp256k1 is the curve auditors encounter in blockchain and fintech contexts. They have existing tooling for it, existing mental models for how key management works, and existing verification scripts. When an auditor can reuse their secp256k1 knowledge rather than learning Ed25519 point encoding from scratch, the compliance conversation gets shorter. That's not a cryptographic argument, it's a practical one - but practical matters when you're sitting across from a gaming commission.
+
+**BIP32/BIP39 key hierarchy compatibility.** BIP32 hierarchical deterministic key derivation and BIP39 mnemonic seeds are secp256k1-native. If your key management already uses BIP32 hardened derivation - which is standard infrastructure in fintech and blockchain systems - the derived keys are secp256k1 keys. A secp256k1 VRF means you can derive VRF signing keys directly from that same HD wallet hierarchy without curve conversion or a separate key ceremony. Ed25519 has SLIP-0010 as an alternative for HD derivation, but it's less widely implemented, less thoroughly tooled, and not what your existing infrastructure is built around.
+
+**Ecosystem and tooling depth.** Bitcoin and Ethereum adoption drove secp256k1 tooling into every major programming language, every major cloud KMS, and most hardware security infrastructure. HSMs, hardware wallets (Ledger, Trezor), cloud key management services, and threshold signing setups all support secp256k1 natively. This isn't theoretical support - it's battle-tested at scale, protecting real value. When your VRF key needs to live in an HSM or participate in a threshold signing ceremony, you want a curve that your infrastructure already handles.
+
+**Key reuse across protocols.** If your system already holds secp256k1 keys for transaction signing, authentication, or other protocols, a secp256k1 VRF lets those same keys generate verifiable random outputs. One key, multiple uses, no cross-curve bridging, no additional key material to manage and secure. This isn't always desirable - key separation is a legitimate security practice - but when your threat model permits it, eliminating a separate VRF key ceremony removes operational complexity and a class of key management errors.
+
+The short version: secp256k1 isn't a better curve than Ed25519 or P-256 in the abstract. It's the right curve when your existing infrastructure, regulatory environment, and key management are already built around it.
+
 ## How We Know It's Correct
 
 The Python implementation serves as the reference oracle. Before generating any secp256k1 vectors, the oracle validates its algorithm logic against the RFC 9381 Appendix B test vectors for P-256 (ECVRF-P256-SHA256-TAI). Byte-identical output on the published P-256 vectors proves the algorithm is correct. Only then does it generate secp256k1 vectors.
