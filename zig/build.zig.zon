@@ -1,0 +1,6 @@
+.{
+    .name = .ecvrf,
+    .version = "0.1.0",
+    .fingerprint = 0x57c79c36cf9ed8df,
+    .paths = .{""},
+}

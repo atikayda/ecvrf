@@ -1,6 +1,9 @@
 # Working directory (plans, requirements, internal docs)
 working/
 
+# Temporary files
+tmp/
+
 # OS files
 .DS_Store
 
@@ -31,3 +34,40 @@ scripts/.bin/
 node_modules/
 dist/
 *.js.map
+
+# C
+c/ecvrf_test
+c/vectors_data.h
+c/*.o
+
+# C#
+csharp/**/bin/
+csharp/**/obj/
+
+# Kotlin
+kotlin/.gradle/
+kotlin/.kotlin/
+kotlin/build/
+kotlin/gradle/
+kotlin/gradlew
+kotlin/gradlew.bat
+
+# Haskell
+haskell/dist-newstyle/
+haskell/.cabal/
+
+# Zig
+zig/.zig-cache/
+zig/zig-out/
+
+# Swift
+swift/.build/
+swift/Package.resolved
+
+# Solidity (Foundry)
+solidity/out/
+solidity/cache/
+solidity/lib/
+
+# Solana
+solana/target/

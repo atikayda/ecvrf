@@ -1,0 +1,25 @@
+[package]
+name = "ecvrf-solana"
+version = "0.1.0"
+edition = "2021"
+description = "RFC 9381 ECVRF-SECP256K1-SHA256-TAI verify-only Solana on-chain program"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/atikayda/ecvrf"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+no-entrypoint = []
+
+[dependencies]
+solana-secp256k1 = "0.1.6"
+solana-nostd-secp256k1-recover = "0.1.1"
+sha2 = "0.10"
+solana-program = "2"
+
+[dev-dependencies]
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
