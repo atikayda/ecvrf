@@ -20,10 +20,24 @@ These are **reference implementations** of ECVRF-SECP256K1-SHA256-TAI (RFC 9381)
 | Go | `decred/dcrd/dcrec/secp256k1` | Yes |
 | Rust | `k256` (RustCrypto) | Yes |
 | TypeScript | `@noble/curves` | Yes |
+| C | OpenSSL `libcrypto` | Yes |
+| C# | BouncyCastle .NET (managed) | No |
+| Kotlin | BouncyCastle Java (managed) | No |
+| Haskell | Pure hand-rolled arithmetic | No |
+| Zig | `std.crypto.ecc.Secp256k1` | Yes |
+| Swift | `libsecp256k1` (via swift-secp256k1) | Yes |
+| Solidity (EVM) | EVM opcodes | N/A (on-chain) |
+| Solana (SVM) | `secp256k1_recover` syscall | N/A (on-chain) |
 
 **Python:** The Python implementation uses the pure-Python `ecdsa` library, which is **not constant-time** and is vulnerable to timing side-channels. It exists solely as a reference oracle for generating and validating test vectors. Do not use it for production secret key operations.
 
-**Go, Rust, TypeScript:** These implementations use constant-time elliptic curve libraries (`decred`, `k256`, `@noble/curves` respectively) and are suitable for use with secret keys. However, none have undergone formal security audits. Use in production at your own risk.
+**Go, Rust, TypeScript, C, Zig, Swift:** These implementations use constant-time elliptic curve libraries and are suitable for use with secret keys. However, none have undergone formal security audits. Use in production at your own risk.
+
+**C#, Kotlin:** These use BouncyCastle's managed (JVM/.NET) big-integer arithmetic, which is **not constant-time**. Suitable for verification of public data, but avoid using for secret key operations in timing-sensitive environments.
+
+**Haskell:** All elliptic curve arithmetic is hand-rolled in pure Haskell with no constant-time guarantees. Not suitable for secret key operations in timing-sensitive environments.
+
+**Solidity, Solana:** On-chain execution is publicly visible and deterministic - all inputs, outputs, and execution traces are observable by design. Timing side-channels are not applicable in this context.
 
 ### Suite String
 

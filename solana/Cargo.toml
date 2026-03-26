@@ -3,7 +3,7 @@ name = "ecvrf-solana"
 version = "0.1.0"
 edition = "2021"
 description = "RFC 9381 ECVRF-SECP256K1-SHA256-TAI verify-only Solana on-chain program"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/atikayda/ecvrf"
 
 [lib]

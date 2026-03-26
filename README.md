@@ -71,7 +71,7 @@ Twelve implementations, all validated against the same shared test vectors. Ever
 | **Python** | `ecdsa`, `hashlib` | Reference oracle. Validates against RFC 9381 P-256 vectors before generating secp256k1 vectors. |
 | **Go** | `dcrd/dcrec/secp256k1` | |
 | **Rust** | `k256`, `sha2` | |
-| **TypeScript** | `@noble/secp256k1`, `@noble/hashes` | |
+| **TypeScript** | `@noble/curves`, `@noble/hashes` | |
 | **C** | OpenSSL `libcrypto` | C11, links against OpenSSL for EC and SHA-256 operations. |
 | **C#** | BouncyCastle.Cryptography | .NET 10, namespace `Ecvrf`. |
 | **Kotlin** | BouncyCastle (`bcprov-jdk18on`) | JVM 21, Gradle/Kotlin DSL. |
@@ -176,6 +176,11 @@ ecvrf/
 │   └── Cargo.toml
 ├── vectors/             # Published test vectors
 │   └── vectors.json
+├── scripts/             # CLI wrappers and cross-validation
+│   ├── cross-validate.sh
+│   ├── python-cli.py
+│   ├── node-cli.mjs
+│   └── solidity-cli.sh
 ├── Makefile             # Build/test automation
 └── .github/
     └── workflows/
@@ -187,14 +192,14 @@ ecvrf/
 ### Prerequisites
 
 - Python 3.12+
-- Go 1.22+
+- Go 1.26+
 - Rust (stable toolchain)
 - Node.js 20+
 - C compiler (cc) + OpenSSL 3 (`brew install openssl@3` on macOS)
 - .NET 10 SDK (`dotnet`)
 - JDK 21+ + Gradle
 - GHC 9.6+ + Cabal
-- Zig 0.14+
+- Zig 0.15+
 - Swift 5.9+ (Xcode 15+ on macOS)
 - Foundry (`forge`) for Solidity
 - Solana CLI + BPF toolchain for the Solana program
@@ -257,8 +262,7 @@ cd kotlin
 **Haskell**:
 ```bash
 cd haskell
-cabal update
-cabal test
+cabal build all && cabal run ecvrf-test
 ```
 
 **Zig**:
@@ -270,7 +274,7 @@ zig build test
 **Swift**:
 ```bash
 cd swift
-swift test
+swift build && swift run ecvrf-test
 ```
 
 **Solidity**:
@@ -282,7 +286,7 @@ forge test
 **Solana**:
 ```bash
 cd solana
-cargo test-sbf
+cargo test
 ```
 
 ### Run All Tests
@@ -308,7 +312,7 @@ Key Makefile targets:
 | `make test-swift` | Swift tests only |
 | `make test-solidity` | Solidity (Foundry) tests only |
 | `make test-solana` | Solana program tests only |
-| `make test-cross` | Cross-implementation validation (NxN) |
+| `make test-cross` | Cross-implementation validation (all available implementations; Swift and Solidity participate when their toolchains are present) |
 | `make vectors` | Regenerate test vectors from the Python oracle |
 | `make cli` | Build CLI binaries for Go, Rust, and TypeScript |
 | `make clean` | Remove build artifacts |
@@ -607,7 +611,7 @@ Vectors are committed to the repo. CI does not regenerate them. Instead:
 2. Run all twelve implementations against committed vectors in parallel
 3. Assert byte-identical proof output and verification for every positive vector
 4. Assert rejection for every negative vector
-5. Run cross-implementation validation (NxN proof generation and verification)
+5. Run cross-implementation validation (proof generation and cross-verification across all available implementations; Swift and Solidity are included when their toolchains are present)
 6. Run determinism checks (prove twice, assert identical output)
 
 ## Non-Goals
