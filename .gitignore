@@ -58,6 +58,11 @@ haskell/.cabal/
 zig/.zig-cache/
 zig/zig-out/
 
+# Dart
+dart/.dart_tool/
+dart/pubspec.lock
+dart/ecvrf-cli
+
 # Swift
 swift/.build/
 swift/Package.resolved
