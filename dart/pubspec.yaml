@@ -1,0 +1,21 @@
+name: ecvrf
+description: >-
+  RFC 9381 ECVRF-SECP256K1-SHA256-TAI (Verifiable Random Function) in pure
+  Dart. Reference implementation, cross-checked against the shared test
+  vectors.
+version: 0.1.0
+repository: https://github.com/atikayda/ecvrf
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  crypto: ^3.0.6
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0
+
+executables:
+  ecvrf-cli: ecvrf_cli

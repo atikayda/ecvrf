@@ -25,6 +25,7 @@ These are **reference implementations** of ECVRF-SECP256K1-SHA256-TAI (RFC 9381)
 | Kotlin | BouncyCastle Java (managed) | No |
 | Haskell | Pure hand-rolled arithmetic | No |
 | Zig | `std.crypto.ecc.Secp256k1` | Yes |
+| Dart | Pure hand-rolled `BigInt` arithmetic | No |
 | Swift | `libsecp256k1` (via swift-secp256k1) | Yes |
 | Solidity (EVM) | EVM opcodes | N/A (on-chain) |
 | Solana (SVM) | `secp256k1_recover` syscall | N/A (on-chain) |
@@ -36,6 +37,8 @@ These are **reference implementations** of ECVRF-SECP256K1-SHA256-TAI (RFC 9381)
 **C#, Kotlin:** These use BouncyCastle's managed (JVM/.NET) big-integer arithmetic, which is **not constant-time**. Suitable for verification of public data, but avoid using for secret key operations in timing-sensitive environments.
 
 **Haskell:** All elliptic curve arithmetic is hand-rolled in pure Haskell with no constant-time guarantees. Not suitable for secret key operations in timing-sensitive environments.
+
+**Dart:** All elliptic curve arithmetic is hand-rolled over Dart's arbitrary-precision `BigInt`, whose operations take value-dependent time, and scalar multiplication is a plain double-and-add whose additions depend on the secret bits. It is **not constant-time**. Suitable for verification of public data; proving with real secret keys is at your own risk and should be avoided in timing-sensitive environments.
 
 **Solidity, Solana:** On-chain execution is publicly visible and deterministic - all inputs, outputs, and execution traces are observable by design. Timing side-channels are not applicable in this context.
 

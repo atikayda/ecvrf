@@ -217,6 +217,35 @@ jobs:
           path: zig/zig-out/bin/ecvrf-cli
           retention-days: 1
 
+  dart:
+    name: Dart tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Install deps
+        working-directory: dart
+        run: dart pub get
+      - name: Check formatting
+        working-directory: dart
+        run: dart format --output=none --set-exit-if-changed .
+      - name: Analyze
+        working-directory: dart
+        run: dart analyze --fatal-infos
+      - name: Run tests
+        working-directory: dart
+        run: dart test
+      - name: Build CLI
+        working-directory: dart
+        run: dart compile exe bin/ecvrf_cli.dart -o ecvrf-cli
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-dart
+          path: dart/ecvrf-cli
+          retention-days: 1
+
   swift:
     name: Swift tests
     runs-on: macos-latest
@@ -266,7 +295,7 @@ jobs:
 
   cross-validate:
     name: Cross-implementation validation
-    needs: [python, go, rust, typescript, c, csharp, kotlin, haskell, zig, swift, solidity, solana]
+    needs: [python, go, rust, typescript, c, csharp, kotlin, haskell, zig, dart, swift, solidity, solana]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -304,6 +333,10 @@ jobs:
         with:
           name: cli-zig
           path: artifacts/zig
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-dart
+          path: artifacts/dart
       - uses: actions/download-artifact@v4
         with:
           name: cli-solana

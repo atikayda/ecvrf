@@ -1,8 +1,8 @@
-.PHONY: test test-python test-go test-rust test-ts test-c test-csharp test-kotlin test-haskell test-zig test-swift test-solidity test-solana test-cross vectors clean cli
+.PHONY: test test-python test-go test-rust test-ts test-c test-csharp test-kotlin test-haskell test-zig test-dart test-swift test-solidity test-solana test-cross vectors clean cli
 
 PYTHON := $(if $(wildcard python/.venv/bin/python3),$(CURDIR)/python/.venv/bin/python3,python3)
 
-test: test-python test-go test-rust test-ts test-c test-csharp test-kotlin test-haskell test-zig test-swift test-solidity test-solana test-cross
+test: test-python test-go test-rust test-ts test-c test-csharp test-kotlin test-haskell test-zig test-dart test-swift test-solidity test-solana test-cross
 
 cli:
 	mkdir -p scripts/.bin
@@ -37,6 +37,9 @@ test-haskell:
 test-zig:
 	cd zig && zig build test
 
+test-dart:
+	cd dart && dart pub get && dart test
+
 test-swift:
 	cd swift && swift build && swift run ecvrf-test
 
@@ -62,6 +65,7 @@ clean:
 	cd kotlin && ./gradlew clean
 	rm -rf haskell/dist-newstyle
 	rm -rf zig/.zig-cache zig/zig-out
+	rm -rf dart/.dart_tool dart/ecvrf-cli
 	rm -rf swift/.build
 	rm -rf solidity/out solidity/cache
 	cd solana && cargo clean

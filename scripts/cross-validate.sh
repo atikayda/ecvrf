@@ -8,6 +8,7 @@ set -euo pipefail
 # Set ECVRF_BIN_DIR to a directory containing pre-built CLI binaries to skip
 # all build steps. Expected layout inside ECVRF_BIN_DIR:
 #   go/ecvrf-go, rust/cli, c/ecvrf_cli, haskell/ecvrf-cli, zig/ecvrf-cli,
+#   dart/ecvrf-cli,
 #   solana/cli, kotlin/ (installDist tree), csharp/ (dotnet publish output),
 #   typescript/ (dist/ + node-cli.mjs), swift/ecvrf-cli (optional)
 # Python and Solidity use scripts from the source tree (no pre-built binary).
@@ -47,6 +48,7 @@ if [ -n "${ECVRF_BIN_DIR:-}" ]; then
     C_CLI="$ECVRF_BIN_DIR/c/ecvrf_cli"
     HASKELL_CLI="$ECVRF_BIN_DIR/haskell/ecvrf-cli"
     ZIG_CLI="$ECVRF_BIN_DIR/zig/ecvrf-cli"
+    DART_CLI="$ECVRF_BIN_DIR/dart/ecvrf-cli"
     SOLANA_CLI="$ECVRF_BIN_DIR/solana/cli"
     KOTLIN_CLI="$ECVRF_BIN_DIR/kotlin/bin/ecvrf-kotlin"
     CSHARP_CLI_DIR="$ECVRF_BIN_DIR/csharp"
@@ -75,7 +77,7 @@ if [ -n "${ECVRF_BIN_DIR:-}" ]; then
     fi
 
     # Make downloaded binaries executable
-    for bin in "$GO_CLI" "$RUST_CLI" "$C_CLI" "$HASKELL_CLI" "$ZIG_CLI" "$SOLANA_CLI" "$KOTLIN_CLI"; do
+    for bin in "$GO_CLI" "$RUST_CLI" "$C_CLI" "$HASKELL_CLI" "$ZIG_CLI" "$DART_CLI" "$SOLANA_CLI" "$KOTLIN_CLI"; do
         [ -f "$bin" ] && chmod +x "$bin"
     done
     # Make Kotlin wrapper scripts executable
@@ -141,6 +143,13 @@ else
         red "Zig build failed"; exit 1
     }
     ZIG_CLI="$ROOT/zig/zig-out/bin/ecvrf-cli"
+
+    # Dart
+    mkdir -p "$ROOT/scripts/.bin"
+    (cd "$ROOT/dart" && dart pub get >/dev/null 2>&1 && dart compile exe bin/ecvrf_cli.dart -o "$ROOT/scripts/.bin/ecvrf-dart" >/dev/null 2>&1) || {
+        red "Dart build failed"; exit 1
+    }
+    DART_CLI="$ROOT/scripts/.bin/ecvrf-dart"
 
     # Swift (optional — not available on all platforms, e.g. Ubuntu CI)
     SWIFT_AVAILABLE=false
@@ -217,7 +226,7 @@ with open('$SUBSET_FILE', 'w') as out:
 NUM_VECTORS=$("$PYTHON" -c "import json; print(len(json.load(open('$SUBSET_FILE'))))")
 
 # Determine prover/verifier counts dynamically
-NUM_PROVERS=9
+NUM_PROVERS=10
 [ "$SOLIDITY_AVAILABLE" = "true" ] && NUM_PROVERS=$((NUM_PROVERS + 1))
 [ "$SWIFT_AVAILABLE" = "true" ] && NUM_PROVERS=$((NUM_PROVERS + 1))
 NUM_VERIFIERS=$((NUM_PROVERS + 1))
@@ -254,6 +263,7 @@ csharp_prebuilt = '$CSHARP_PREBUILT' == 'true'
 kotlin_cli = '$KOTLIN_CLI'
 haskell_cli = '$HASKELL_CLI'
 zig_cli = '$ZIG_CLI'
+dart_cli = '$DART_CLI'
 swift_cli = '$SWIFT_CLI'
 swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
@@ -293,6 +303,7 @@ for i, vec in enumerate(vectors):
         'kotlin':     [kotlin_cli, 'prove', sk] + aa,
         'haskell':    [haskell_cli, 'prove', sk] + aa,
         'zig':        [zig_cli, 'prove', sk] + aa,
+        'dart':       [dart_cli, 'prove', sk] + aa,
     }
     if solidity_available:
         cmds['solidity'] = ['bash', solidity_cli, 'prove', sk] + aa
@@ -367,6 +378,7 @@ csharp_prebuilt = '$CSHARP_PREBUILT' == 'true'
 kotlin_cli = '$KOTLIN_CLI'
 haskell_cli = '$HASKELL_CLI'
 zig_cli = '$ZIG_CLI'
+dart_cli = '$DART_CLI'
 swift_cli = '$SWIFT_CLI'
 swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
@@ -378,7 +390,7 @@ def csharp_cmd(*args):
         return ['dotnet', 'exec', csharp_dir + '/Ecvrf.Cli.dll'] + list(args)
     return ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--'] + list(args)
 
-prover_impls = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig']
+prover_impls = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig', 'dart']
 if solidity_available:
     prover_impls.append('solidity')
 if swift_available:
@@ -396,6 +408,7 @@ def prove_cmd(impl, sk, aa):
         'kotlin':     [kotlin_cli, 'prove', sk] + aa,
         'haskell':    [haskell_cli, 'prove', sk] + aa,
         'zig':        [zig_cli, 'prove', sk] + aa,
+        'dart':       [dart_cli, 'prove', sk] + aa,
     }
     if solidity_available:
         cmds['solidity'] = ['bash', solidity_cli, 'prove', sk] + aa
@@ -414,6 +427,7 @@ def verify_cmd(impl, pk, pi, aa):
         'kotlin':     [kotlin_cli, 'verify', pk, pi] + aa,
         'haskell':    [haskell_cli, 'verify', pk, pi] + aa,
         'zig':        [zig_cli, 'verify', pk, pi] + aa,
+        'dart':       [dart_cli, 'verify', pk, pi] + aa,
         'solana':     [solana_cli, 'verify', pk, pi] + aa,
     }
     if solidity_available:
@@ -512,6 +526,7 @@ csharp_prebuilt = '$CSHARP_PREBUILT' == 'true'
 kotlin_cli = '$KOTLIN_CLI'
 haskell_cli = '$HASKELL_CLI'
 zig_cli = '$ZIG_CLI'
+dart_cli = '$DART_CLI'
 swift_cli = '$SWIFT_CLI'
 swift_available = '$SWIFT_AVAILABLE' == 'true'
 solidity_cli = '$SOLIDITY_CLI'
@@ -523,7 +538,7 @@ def csharp_cmd(*args):
         return ['dotnet', 'exec', csharp_dir + '/Ecvrf.Cli.dll'] + list(args)
     return ['dotnet', 'run', '--project', csharp_dir, '-c', 'Release', '--no-build', '--'] + list(args)
 
-verifier_names = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig']
+verifier_names = ['go', 'python', 'rust', 'typescript', 'c', 'csharp', 'kotlin', 'haskell', 'zig', 'dart']
 if solidity_available:
     verifier_names.append('solidity')
 if swift_available:
@@ -541,6 +556,7 @@ def verify_cmd(impl, pk, pi, aa):
         'kotlin':     [kotlin_cli, 'verify', pk, pi] + aa,
         'haskell':    [haskell_cli, 'verify', pk, pi] + aa,
         'zig':        [zig_cli, 'verify', pk, pi] + aa,
+        'dart':       [dart_cli, 'verify', pk, pi] + aa,
         'solana':     [solana_cli, 'verify', pk, pi] + aa,
     }
     if solidity_available:

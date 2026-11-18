@@ -1,11 +1,11 @@
 # Contributing
 
-Contributions are welcome. This project implements RFC 9381 ECVRF-SECP256K1-SHA256-TAI across twelve languages, so changes need care to maintain spec compliance and cross-implementation consistency.
+Contributions are welcome. This project implements RFC 9381 ECVRF-SECP256K1-SHA256-TAI across thirteen languages, so changes need care to maintain spec compliance and cross-implementation consistency.
 
 ## Running Tests
 
 ```bash
-make test          # Run all tests (all 12 implementations + cross-validation)
+make test          # Run all tests (all 13 implementations + cross-validation)
 make test-python   # Python oracle only
 make test-go       # Go only
 make test-rust     # Rust only
@@ -15,6 +15,7 @@ make test-csharp   # C# only
 make test-kotlin   # Kotlin only
 make test-haskell  # Haskell only
 make test-zig      # Zig only
+make test-dart     # Dart only
 make test-swift    # Swift only
 make test-solidity # Solidity (Foundry) only
 make test-solana   # Solana only
@@ -28,7 +29,7 @@ make clean         # Remove build artifacts
 
 1. Edit `python/generate.py` to add new vector definitions
 2. Run `make vectors` to regenerate `vectors/vectors.json`
-3. Run `make test` to confirm all twelve implementations pass against the updated vectors
+3. Run `make test` to confirm all thirteen implementations pass against the updated vectors
 4. Commit both `generate.py` and `vectors.json` together
 
 ## Code Style
@@ -42,13 +43,14 @@ make clean         # Remove build artifacts
 - **Kotlin:** Kotlin coding conventions, Gradle/Kotlin DSL
 - **Haskell:** consistent with existing module style, avoid unnecessary dependencies
 - **Zig:** follow Zig standard library conventions, zero external dependencies
+- **Dart:** `dart format`, `dart analyze --fatal-infos` clean, pure Dart (no native code or FFI), only `package:crypto` at runtime
 - **Swift:** Swift API Design Guidelines, Swift 5.9+
 - **Solidity:** Solidity Style Guide, Foundry project conventions
 - **Solana:** Rust conventions, compatible with Solana BPF toolchain
 
 ## Pull Request Requirements
 
-- All twelve implementations must pass (`make test`)
+- All thirteen implementations must pass (`make test`)
 - Cross-validation must pass (`make test-cross`)
 - If adding vectors, include the regenerated `vectors/vectors.json`
 - Changes must not break RFC 9381 compliance — the implementations must remain compatible with the published spec
